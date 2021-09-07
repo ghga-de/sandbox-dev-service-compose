@@ -73,11 +73,32 @@ services:
       SANDBOX_STORAGE_PORT: 8080
       SANDBOX_STORAGE_log_level: debug
       SANDBOX_STORAGE_DB_PATH: postgresql://admin:admin@sandbox_storage_svc_db/storage
+      DB_URL: postgresql://admin:admin@sandbox_storage_svc_db/storage
       SANDBOX_STORAGE_S3_PATH: http://sandbox_storage_svc_s3:4566
       SANDBOX_STORAGE_RABBITMQ_HOST: rabbitmq
       SANDBOX_STORAGE_RABBITMQ_PORT: 5672
       # path as seen by the ui running in the browser:
       SANDBOX_STORAGE_DRS_PATH: drs://localhost:8002/
+    entrypoint: ["/bin/bash", "-c"]
+    command: |
+      """
+      # install additional deps as they are needed for the population script;
+      cd /app
+      pip install ".[dev,testing]"
+
+      # initialize db (if not already done):
+      cd /app/database_migration
+      /home/appuser/.local/bin/alembic -c alembic.ini upgrade head
+
+      # cleanup database:
+      /app/scripts/cleanup_db.py
+
+      # pre-populate database:
+      /app/scripts/populate_db.py
+
+      # run the service:
+      sandbox-storage
+      """
     ports:
       - 8002:8080
     depends_on:
@@ -97,7 +118,7 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: storage
-    command: ['postgres', '-c', 'work_mem: 512MB']
+    command: ['postgres', '-c', 'work_mem=512MB']
     deploy:
       endpoint_mode : dnsrr
 
