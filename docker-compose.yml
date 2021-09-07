@@ -146,4 +146,3 @@ volumes:
   sandbox_metadata_db_fs: {}
   sandbox_storage_db_fs: {}
   sandbox_storage_s3_fs: {}
-  
