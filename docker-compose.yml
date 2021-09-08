@@ -144,11 +144,32 @@ services:
 
   # sandbox-request:
 
-  sandbox_request_svc:
+  sandbox_request_rest_svc:
     image: ghga/sandbox-request:dev
     environment:
       SANDBOX_REQUEST_HOST: 0.0.0.0
       SANDBOX_REQUEST_PORT: 8080
+      SANDBOX_REQUEST_LOG_LEVEL: debug
+      SANDBOX_REQUEST_DB_URL: mongodb://sandbox_request_db:27017
+      SANDBOX_REQUEST_DB_NAME: request
+      SANDBOX_REQUEST_SVC_METADATA_URL: http://sandbox_metadata_svc:8080
+      SANDBOX_REQUEST_RABBITMQ_HOST: rabbitmq
+      SANDBOX_REQUEST_RABBITMQ_PORT: 5672
+      SANDBOX_REQUEST_DATA_REQUESTER_EMAIL: ghga.notification@gmail.de
+      SANDBOX_REQUEST_DATA_REQUESTER_NAME: "Carry Catfish"
+      SANDBOX_REQUEST_DATA_STEWARD_EMAIL: ghga.notification@gmail.de
+      SANDBOX_REQUEST_DATA_STEWARD_NAME: "Mike Mushroom"
+    command: rest-api
+    ports:
+      - 8003:8080
+    depends_on:
+      - sandbox_metadata_svc
+      - sandbox_request_db
+      - sandbox_request_async_svc
+
+  sandbox_request_async_svc:
+    image: ghga/sandbox-request:dev
+    environment:
       SANDBOX_REQUEST_LOG_LEVEL: debug
       SANDBOX_REQUEST_DB_URL: mongodb://sandbox_request_db:27017
       SANDBOX_REQUEST_DB_NAME: request
@@ -167,15 +188,13 @@ services:
       pip install ".[all]"
 
       # pre-populate the database:
-      /service/scripts/populate_db.py \
-        	--db-url "${SANDBOX_REQUEST_DB_URL}" \
-          --db-name "${SANDBOX_REQUEST_DB_NAME}"
+      # /service/scripts/populate_db.py \
+      #   	--db-url "${SANDBOX_REQUEST_DB_URL}" \
+      #     --db-name "${SANDBOX_REQUEST_DB_NAME}"
 
       # run the service:
-      sandbox-request
+      sandbox-request async-api
       """
-    ports:
-      - 8003:8080
     depends_on:
       - sandbox_metadata_svc
       - sandbox_request_db
