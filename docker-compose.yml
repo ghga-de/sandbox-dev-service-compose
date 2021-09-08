@@ -32,11 +32,11 @@ services:
   sandbox_metadata_svc:
     image: ghga/sandbox-metadata:dev
     environment:
-      METADATA_SERVICE_HOST: 0.0.0.0
-      METADATA_SERVICE_PORT: 8080
-      METADATA_SERVICE_LOG_LEVEL: debug
-      METADATA_SERVICE_DB_URL: mongodb://sandbox_metadata_db:27017
-      METADATA_SERVICE_DB_NAME: metadata
+      SANDBOX_METADATA_HOST: 0.0.0.0
+      SANDBOX_METADATA_PORT: 8080
+      SANDBOX_METADATA_LOG_LEVEL: debug
+      SANDBOX_METADATA_DB_URL: mongodb://sandbox_metadata_db:27017
+      SANDBOX_METADATA_DB_NAME: metadata
     entrypoint: ["/bin/bash", "-c"]
     command: |
       """
