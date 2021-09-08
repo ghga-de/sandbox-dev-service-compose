@@ -37,20 +37,28 @@ services:
       SANDBOX_METADATA_LOG_LEVEL: debug
       SANDBOX_METADATA_DB_URL: mongodb://sandbox_metadata_db:27017
       SANDBOX_METADATA_DB_NAME: metadata
-    entrypoint: ["/bin/bash", "-c"]
+    entrypoint: ["bash", "-c"]
     command: |
-      """
+      '''
       # install additional deps as they are needed for the population script;
       cd /service
       pip install ".[all]"
 
+      # delete records in db and initialise counters:
+      python3 /service/scripts/delete_all_metadata_records.py \
+        --db-url "$${SANDBOX_METADATA_DB_URL}" \
+        --db-name "$${SANDBOX_METADATA_DB_NAME}"
+      python3 /service/scripts/generate_sequence_for_collections.py \
+        --db-url "$${SANDBOX_METADATA_DB_URL}" \
+        --db-name "$${SANDBOX_METADATA_DB_NAME}"
+
       # pre-populate the database via the API:
       # (wait for the API to come up)
-      ( sleep 2 && /service/scripts/populate_metadata_store.py --base-url http://localhost:8080 ) &
+      ( sleep 2 && /service/scripts/populate_metadata_store.py --base-url http://localhost:8080 --directory /service/examples ) &
 
       # run the service:
       metadata-service
-      """
+      '''
     ports:
       - 8001:8080
     depends_on:
@@ -81,7 +89,7 @@ services:
       SANDBOX_STORAGE_DRS_PATH: drs://localhost:8002/
     entrypoint: ["/bin/bash", "-c"]
     command: |
-      """
+      '''
       # install additional deps as they are needed for the population script;
       cd /app
       pip install ".[dev,testing]"
@@ -98,7 +106,7 @@ services:
 
       # run the service:
       sandbox-storage
-      """
+      '''
     ports:
       - 8002:8080
     depends_on:
@@ -182,19 +190,19 @@ services:
       SANDBOX_REQUEST_DATA_STEWARD_NAME: "Mike Mushroom"
     entrypoint: ["/bin/bash", "-c"]
     command: |
-      """
+      '''
       # install additional deps as they are needed for the population script;
       cd /service
       pip install ".[all]"
 
       # pre-populate the database:
       # /service/scripts/populate_db.py \
-      #   	--db-url "${SANDBOX_REQUEST_DB_URL}" \
-      #     --db-name "${SANDBOX_REQUEST_DB_NAME}"
+      #   --db-url "$${SANDBOX_REQUEST_DB_URL}" \
+      #   --db-name "$${SANDBOX_REQUEST_DB_NAME}"
 
       # run the service:
       sandbox-request async-api
-      """
+      '''
     depends_on:
       - sandbox_metadata_svc
       - sandbox_request_db
