@@ -142,7 +142,51 @@ services:
           nocopy: true
 
 
+  # sandbox-request:
+
+  sandbox_request_svc:
+    image: ghga/sandbox-request:dev
+    environment:
+      SANDBOX_REQUEST_HOST: 0.0.0.0
+      SANDBOX_REQUEST_PORT: 8080
+      SANDBOX_REQUEST_LOG_LEVEL: debug
+      SANDBOX_REQUEST_DB_URL: mongodb://sandbox_request_db:27017
+      SANDBOX_REQUEST_DB_NAME: request
+      SANDBOX_REQUEST_RABBITMQ_HOST: rabbitmq
+      SANDBOX_REQUEST_RABBITMQ_PORT: 5672
+      SANDBOX_REQUEST_DATA_REQUESTER_EMAIL: ghga.notification@gmail.de
+      SANDBOX_REQUEST_DATA_REQUESTER_NAME: "Carry Catfish"
+      SANDBOX_REQUEST_DATA_STEWARD_EMAIL: ghga.notification@gmail.de
+      SANDBOX_REQUEST_DATA_STEWARD_NAME: "Mike Mushroom"
+    entrypoint: ["/bin/bash", "-c"]
+    command: |
+      """
+      # install additional deps as they are needed for the population script;
+      cd /service
+      pip install ".[all]"
+
+      # pre-populate the database:
+      /service/scripts/populate_db.py \
+        	--db-url "${SANDBOX_REQUEST_DB_URL}" \
+          --db-name "${SANDBOX_REQUEST_DB_NAME}"
+
+      # run the service:
+      sandbox-request
+      """
+    ports:
+      - 8003:8080
+    depends_on:
+      - sandbox_request_db
+
+  sandbox_request_db:
+    image: mongo:4.4.6
+    volumes:
+      - sandbox_request_db_fs:/data/db
+    ports:
+      - 27001:27017
+
 volumes:
   sandbox_metadata_db_fs: {}
   sandbox_storage_db_fs: {}
   sandbox_storage_s3_fs: {}
+  sandbox_request_db_fs: {}
