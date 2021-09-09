@@ -32,25 +32,37 @@ services:
   sandbox_metadata_svc:
     image: ghga/sandbox-metadata:dev
     environment:
-      METADATA_SERVICE_HOST: 0.0.0.0
-      METADATA_SERVICE_PORT: 8080
-      METADATA_SERVICE_LOG_LEVEL: debug
-      METADATA_SERVICE_DB_URL: mongodb://sandbox_metadata_db:27017
-      METADATA_SERVICE_DB_NAME: metadata
-    entrypoint: ["/bin/bash", "-c"]
+      SANDBOX_METADATA_HOST: 0.0.0.0
+      SANDBOX_METADATA_PORT: 8080
+      SANDBOX_METADATA_CORS_ALLOWED_ORIGINS: '["*"]'
+      SANDBOX_METADATA_CORS_ALLOW_CREDENTIALS: "true"
+      SANDBOX_METADATA_CORS_ALLOWED_METHODS: '["*"]'
+      SANDBOX_METADATA_CORS_ALLOWED_HEADERS: '["*"]'
+      SANDBOX_METADATA_LOG_LEVEL: debug
+      SANDBOX_METADATA_DB_URL: mongodb://sandbox_metadata_db:27017
+      SANDBOX_METADATA_DB_NAME: metadata
+    entrypoint: ["bash", "-c"]
     command: |
-      """
+      '''
       # install additional deps as they are needed for the population script;
       cd /service
       pip install ".[all]"
 
+      # delete records in db and initialise counters:
+      python3 /service/scripts/delete_all_metadata_records.py \
+        --db-url "$${SANDBOX_METADATA_DB_URL}" \
+        --db-name "$${SANDBOX_METADATA_DB_NAME}"
+      python3 /service/scripts/generate_sequence_for_collections.py \
+        --db-url "$${SANDBOX_METADATA_DB_URL}" \
+        --db-name "$${SANDBOX_METADATA_DB_NAME}"
+
       # pre-populate the database via the API:
       # (wait for the API to come up)
-      ( sleep 2 && /service/scripts/populate_metadata_store.py --base-url http://localhost:8080 ) &
+      ( sleep 2 && /service/scripts/populate_metadata_store.py --base-url http://localhost:8080 --directory /service/examples ) &
 
       # run the service:
       metadata-service
-      """
+      '''
     ports:
       - 8001:8080
     depends_on:
@@ -72,6 +84,10 @@ services:
       SANDBOX_STORAGE_HOST: 0.0.0.0
       SANDBOX_STORAGE_PORT: 8080
       SANDBOX_STORAGE_log_level: debug
+      SANDBOX_STORAGE_CORS_ALLOWED_ORIGINS: '["*"]'
+      SANDBOX_STORAGE_CORS_ALLOW_CREDENTIALS: "true"
+      SANDBOX_STORAGE_CORS_ALLOWED_METHODS: '["*"]'
+      SANDBOX_STORAGE_CORS_ALLOWED_HEADERS: '["*"]'
       SANDBOX_STORAGE_DB_PATH: postgresql://admin:admin@sandbox_storage_svc_db/storage
       DB_URL: postgresql://admin:admin@sandbox_storage_svc_db/storage
       SANDBOX_STORAGE_S3_PATH: http://sandbox_storage_svc_s3:4566
@@ -81,7 +97,7 @@ services:
       SANDBOX_STORAGE_DRS_PATH: drs://localhost:8002/
     entrypoint: ["/bin/bash", "-c"]
     command: |
-      """
+      '''
       # install additional deps as they are needed for the population script;
       cd /app
       pip install ".[dev,testing]"
@@ -98,7 +114,7 @@ services:
 
       # run the service:
       sandbox-storage
-      """
+      '''
     ports:
       - 8002:8080
     depends_on:
@@ -142,7 +158,77 @@ services:
           nocopy: true
 
 
+  # sandbox-request:
+
+  sandbox_request_rest_svc:
+    image: ghga/sandbox-request:dev
+    environment:
+      SANDBOX_REQUEST_HOST: 0.0.0.0
+      SANDBOX_REQUEST_PORT: 8080
+      SANDBOX_REQUEST_LOG_LEVEL: debug
+      SANDBOX_REQUEST_CORS_ALLOWED_ORIGINS: '["*"]'
+      SANDBOX_REQUEST_CORS_ALLOW_CREDENTIALS: "true"
+      SANDBOX_REQUEST_CORS_ALLOWED_METHODS: '["*"]'
+      SANDBOX_REQUEST_CORS_ALLOWED_HEADERS: '["*"]'
+      SANDBOX_REQUEST_DB_URL: mongodb://sandbox_request_db:27017
+      SANDBOX_REQUEST_DB_NAME: request
+      SANDBOX_REQUEST_SVC_METADATA_URL: http://sandbox_metadata_svc:8080
+      SANDBOX_REQUEST_RABBITMQ_HOST: rabbitmq
+      SANDBOX_REQUEST_RABBITMQ_PORT: 5672
+      SANDBOX_REQUEST_DATA_REQUESTER_EMAIL: ghga.notification@gmail.de
+      SANDBOX_REQUEST_DATA_REQUESTER_NAME: "Carry Catfish"
+      SANDBOX_REQUEST_DATA_STEWARD_EMAIL: ghga.notification@gmail.de
+      SANDBOX_REQUEST_DATA_STEWARD_NAME: "Mike Mushroom"
+    command: rest-api
+    ports:
+      - 8003:8080
+    depends_on:
+      - sandbox_metadata_svc
+      - sandbox_request_db
+      - sandbox_request_async_svc
+
+  sandbox_request_async_svc:
+    image: ghga/sandbox-request:dev
+    environment:
+      SANDBOX_REQUEST_LOG_LEVEL: debug
+      SANDBOX_REQUEST_DB_URL: mongodb://sandbox_request_db:27017
+      SANDBOX_REQUEST_DB_NAME: request
+      SANDBOX_REQUEST_SVC_METADATA_URL: http://sandbox_metadata_svc:8080
+      SANDBOX_REQUEST_RABBITMQ_HOST: rabbitmq
+      SANDBOX_REQUEST_RABBITMQ_PORT: 5672
+      SANDBOX_REQUEST_DATA_REQUESTER_EMAIL: ghga.notification@gmail.de
+      SANDBOX_REQUEST_DATA_REQUESTER_NAME: "Carry Catfish"
+      SANDBOX_REQUEST_DATA_STEWARD_EMAIL: ghga.notification@gmail.de
+      SANDBOX_REQUEST_DATA_STEWARD_NAME: "Mike Mushroom"
+    entrypoint: ["/bin/bash", "-c"]
+    command: |
+      '''
+      # install additional deps as they are needed for the population script;
+      cd /service
+      pip install ".[all]"
+
+      # pre-populate the database:
+      /service/scripts/populate_db.py \
+        --db-url "$${SANDBOX_REQUEST_DB_URL}" \
+        --db-name "$${SANDBOX_REQUEST_DB_NAME}"
+
+      # run the service:
+      sandbox-request async-api
+      '''
+    depends_on:
+      - sandbox_metadata_svc
+      - sandbox_request_db
+
+  sandbox_request_db:
+    image: mongo:4.4.6
+    volumes:
+      - sandbox_request_db_fs:/data/db
+    ports:
+      - 27001:27017
+
 volumes:
   sandbox_metadata_db_fs: {}
   sandbox_storage_db_fs: {}
   sandbox_storage_s3_fs: {}
+  sandbox_request_db_fs: {}
+
