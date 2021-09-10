@@ -58,7 +58,7 @@ services:
 
       # pre-populate the database via the API:
       # (wait for the API to come up)
-      ( sleep 2 && /service/scripts/populate_metadata_store.py --base-url http://localhost:8080 --directory /service/examples ) &
+      (sleep 2 && /service/scripts/populate_metadata_store.py --base-url http://localhost:8080) &
 
       # run the service:
       metadata-service
