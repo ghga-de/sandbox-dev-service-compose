@@ -186,6 +186,7 @@ services:
       - sandbox_metadata_svc
       - sandbox_request_db
       - sandbox_request_async_svc
+      - rabbitmq
 
   sandbox_request_async_svc:
     image: ghga/sandbox-request:dev
@@ -196,6 +197,8 @@ services:
       SANDBOX_REQUEST_SVC_METADATA_URL: http://sandbox_metadata_svc:8080
       SANDBOX_REQUEST_RABBITMQ_HOST: rabbitmq
       SANDBOX_REQUEST_RABBITMQ_PORT: 5672
+      SANDBOX_REQUEST_TOPIC_NAME_DOWNLOAD_REQUESTED: download_request
+      SANDBOX_REQUEST_TOPIC_NAME_SEND_NOTIFICATION: send_notifications
       SANDBOX_REQUEST_DATA_REQUESTER_EMAIL: ghga.notification@gmail.de
       SANDBOX_REQUEST_DATA_REQUESTER_NAME: "Carry Catfish"
       SANDBOX_REQUEST_DATA_STEWARD_EMAIL: ghga.notification@gmail.de
@@ -218,6 +221,8 @@ services:
     depends_on:
       - sandbox_metadata_svc
       - sandbox_request_db
+      - sandbox_notification_svc
+      - rabbitmq
 
   sandbox_request_db:
     image: mongo:4.4.6
@@ -226,9 +231,47 @@ services:
     ports:
       - 27001:27017
 
+
+  # sandbox-notification:
+  
+  sandbox_notification_svc:
+    image: ghga/sandbox-notification:dev
+    environment:
+      SANDBOX_NOTIFICATION_RABBITMQ_HOST: rabbitmq
+      SANDBOX_NOTIFICATION_RABBITMQ_PORT: 5672
+      SANDBOX_NOTIFICATION_TOPIC_NAME: send_notification
+      SANDBOX_NOTIFICATION_MAX_ATTEMPTS: 1
+      SANDBOX_NOTIFICATION_LOG_LEVEL: debug
+      SANDBOX_NOTIFICATION_SMTP_SERVER: sandbox_notification_fakesmtp
+      SANDBOX_NOTIFICATION_SMTP_PORT: 2525
+      SANDBOX_NOTIFICATION_SMTP_USERNAME: example
+      SANDBOX_NOTIFICATION_SMTP_PASSWORD: example
+      SANDBOX_NOTIFICATION_SENDER_EMAIL: example@example.org
+      SANDBOX_NOTIFICATION_SMTP_USE_TLS: "false"
+    entrypoint: ["/bin/bash", "-c"]
+    command: |
+      '''
+      # make sure that service is running when
+      # dependencies are ready:
+      sleep 10
+      sandbox-notification
+      '''
+    depends_on:
+      - sandbox_notification_fakesmtp
+      - rabbitmq
+
+  sandbox_notification_fakesmtp:
+    image: ghga/fakesmtp:latest
+    command: -a 0.0.0.0 --background --output-dir /var/mail --port 2525 --start-server
+    volumes:
+      - sandbox_notification_mail_fs:/var/mail
+    ports:
+      - 2525:2525
+
 volumes:
   sandbox_metadata_db_fs: {}
   sandbox_storage_db_fs: {}
   sandbox_storage_s3_fs: {}
   sandbox_request_db_fs: {}
+  sandbox_notification_mail_fs: {}
 
